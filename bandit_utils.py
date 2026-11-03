@@ -1,3 +1,45 @@
+import numpy as np
+
+def initialize_gaussian_bandits(n_arms=3, prior_mean=0.0, prior_var=25.0):
+    """Initialize posteriors for each arm: mean and variance."""
+    return [{"mean": prior_mean, "var": prior_var} for _ in range(n_arms)]
+
+def gaussian_thompson_sampling_step(posteriors, true_means, sigma, rng):
+    """
+    Performs one round of Gaussian Thompson Sampling:
+    1. Sample a possible mean from each current Normal posterior.
+    2. Select the largest.
+    3. Generate one Gaussian reward.
+    4. Update only the selected alternative's posterior.
+    """
+    # 1. Sample from each posterior
+    sampled_means = [
+        rng.normal(loc=arm["mean"], scale=np.sqrt(arm["var"])) 
+        for arm in posteriors
+    ]
+    
+    # 2. Select alternative with the largest sampled mean
+    chosen_arm = int(np.argmax(sampled_means))
+    
+    # 3. Generate continuous reward: R | A = i ~ Normal(mu_i, sigma^2)
+    reward = rng.normal(loc=true_means[chosen_arm], scale=sigma)
+    
+    # 4. Update the selected alternative's posterior using conjugate formulas
+    prior_mean = posteriors[chosen_arm]["mean"]
+    prior_var = posteriors[chosen_arm]["var"]
+    
+    obs_precision = 1.0 / (sigma ** 2)
+    prior_precision = 1.0 / prior_var
+    
+    post_precision = prior_precision + obs_precision
+    post_var = 1.0 / post_precision
+    post_mean = post_var * (prior_precision * prior_mean + obs_precision * reward)
+    
+    posteriors[chosen_arm]["mean"] = post_mean
+    posteriors[chosen_arm]["var"] = post_var
+    
+    return chosen_arm, reward
+
 # bandit_utils.py
 
 import random
